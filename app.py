@@ -1,11 +1,14 @@
 from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS  # Import CORS
 from openai import OpenAI
 from pathlib import Path    
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 # OpenAI API key
-api_key = "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"
+# IMPORTANT: Replace with an environment variable or a secure method
+api_key = "your-api-key"
 openai_client = OpenAI(api_key=api_key)
 
 # Initialize interview questions and audio file paths as empty lists
@@ -73,13 +76,8 @@ def submit_answer():
     global candidate_responses, current_question_index
     audio_file = request.files.get("answer")
     
-    # Process candidate's voice answer using OpenAI Speech-to-Text (STT)
-    transcript_response = openai_client.audio.transcriptions.create(
-        model="whisper-1",
-        file=audio_file.read()
-    )
-    
-    candidate_responses.append(transcript_response["text"])
+   
+    candidate_responses.append(audio_file)
     
     # Check if there are more questions, if yes, increment the index
     if current_question_index < len(questions_list):
