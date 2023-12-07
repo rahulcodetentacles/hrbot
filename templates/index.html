@@ -66,82 +66,87 @@
 
     <script>
         $(document).ready(function () {
-            let mediaRecorder;
-            let audioChunks = [];
-            let currentAudio;
+    let mediaRecorder;
+    let audioChunks = [];
+    let currentAudio;
 
-            function getQuestion() {
-                $.get("/get_question", function (data) {
-                    if (data.question) {
-                        $("#question").text("Question: " + data.question);
-                        if (currentAudio) {
-                            currentAudio.pause();
-                            currentAudio.currentTime = 0;
-                        }
-                        currentAudio = new Audio("/static/question.mp3");
-                        currentAudio.play();
-                        audioChunks = [];
-                    } else {
-                        $("#question-container").hide();
-                        getAssessment();
-                    }
-                });
-            }
-
-            function startRecording() {
-                navigator.mediaDevices.getUserMedia({ audio: true })
-                    .then(function (stream) {
-                        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-                        mediaRecorder.ondataavailable = function (event) {
-                            if (event.data.size > 0) {
-                                audioChunks.push(event.data);
-                            }
-                        };
-                        mediaRecorder.onstop = function () {
-                            let audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                            convertToMp3(audioBlob);
-                        };
-                        mediaRecorder.start();
-                    })
-                    .catch(function (error) {
-                        console.error("Error accessing microphone:", error);
-                    });
-            }
-
-            function convertToMp3(blob) {
-                const reader = new FileReader();
-                reader.onloadend = function () {
-                    const audioData = reader.result.split(',')[1];
-                    $.ajax({
-                        type: "POST",
-                        url: "/submit_answer",
-                        data: { answer: audioData },
-                        success: function (data) {
-                            if (data.status === "success") {
-                                getQuestion();
-                            }
-                        },
-                    });
-                };
-                reader.readAsDataURL(blob);
-            }
-
-            function getAssessment() {
-                $.get("/get_assessment", function (data) {
-                    $("#assessment").text(data.assessment);
-                    $("#assessment-container").show();
-                });
-            }
-
-            getQuestion();
-            startRecording();
-
-            $("#submit-answer").click(function () {
-                if (mediaRecorder && mediaRecorder.state === "recording") {
-                    mediaRecorder.stop();
+    function getQuestion() {
+        $.get("/get_question", function (data) {
+            if (data.question) {
+                $("#question").text("Question: " + data.question);
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio.currentTime = 0;
                 }
-            });
+                loadAndPlayAudio("/static/question.mp3");
+                audioChunks = [];
+                startRecording();
+            } else {
+                $("#question-container").hide();
+                getAssessment();
+            }
         });
+    }
+
+    function startRecording() {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(function (stream) {
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                mediaRecorder.ondataavailable = function (event) {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+                mediaRecorder.onstop = function () {
+                    let audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    convertToMp3(audioBlob);
+                };
+                mediaRecorder.start();
+            })
+            .catch(function (error) {
+                console.error("Error accessing microphone:", error);
+            });
+    }
+
+    function convertToMp3(blob) {
+        const reader = new FileReader();
+        reader.onloadend = function () {
+            const audioData = reader.result.split(',')[1];
+            $.ajax({
+                type: "POST",
+                url: "/submit_answer",
+                data: { answer: audioData },
+                success: function (data) {
+                    if (data.status === "success") {
+                        getQuestion();
+                    }
+                },
+            });
+        };
+        reader.readAsDataURL(blob);
+    }
+
+    function loadAndPlayAudio(audioSrc) {
+        currentAudio = new Audio(audioSrc);
+        currentAudio.play();
+    }
+
+    function getAssessment() {
+        $.get("/get_assessment", function (data) {
+            $("#assessment").text(data.assessment);
+            $("#assessment-container").show();
+        });
+    }
+
+    getQuestion();
+
+    $("#submit-answer").click(function () {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+        }
+    });
+});
+
     </script>
 </body>
 

@@ -7,8 +7,7 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
 # OpenAI API key
-# IMPORTANT: Replace with an environment variable or a secure method
-api_key = "your-api-key"
+api_key = "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"
 openai_client = OpenAI(api_key=api_key)
 
 # Initialize interview questions and audio file paths as empty lists
