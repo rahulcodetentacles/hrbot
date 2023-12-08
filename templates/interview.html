@@ -46,7 +46,7 @@
 
 <body>
     <div class="container mt-5">
-        <h1 class="text-center mb-4">HR Interviewer - Developer Position</h1>
+        <h1 class="text-center mb-4">HR Interview</h1>
 
         <div id="question-container" class="card">
             <p id="question" class="mb-3"></p>
@@ -78,7 +78,8 @@
                     currentAudio.pause();
                     currentAudio.currentTime = 0;
                 }
-                loadAndPlayAudio("/static/question.mp3");
+                const audioSrc = `/static/question_${data.questionIndex}.mp3`;
+                loadAndPlayAudio(audioSrc);
                 audioChunks = [];
                 startRecording();
             } else {
