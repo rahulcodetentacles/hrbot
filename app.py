@@ -9,10 +9,12 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
 # OpenAI API key
-api_key = "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"
+api_key = "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"
 openai_client = OpenAI(api_key=api_key)
 
 thread = openai_client.beta.threads.create()
+print("Thread ID: ",thread.id)
+# thread_id = "thread_jwQJZJIZjR3iIPCDozn8guq7"
 
 # Initialize interview questions and audio file paths as empty lists
 questions_list = []
@@ -47,7 +49,18 @@ def generate_interview_questions(prompt):
 
     # Generate new questions using OpenAI
     for i in range(num_questions_to_generate):
-        message = f"Ask one liner questions to the candidate."
+        # Generate casual questions for the first 3 questions
+        if i == 0:
+            message = f"Ask a casual question, which can include a friendly greeting or any question that helps establish a positive and comfortable atmosphere for the conversation. Keep it super simple."
+        elif i == 1:
+            message = f"Ask a question that encourages the candidate to share a bit about their experiences or interests outside of work, contributing to a more relaxed and personable exchange. Keep it super simple."
+        elif i == 2:
+            message = f"Inquire about the candidate's professional journey. Pose a question that invites them to share a memorable or impactful experience from their career, fostering a positive and open dialogue. Keep it super simple."
+        elif i == 3:
+            message = f"Ask a simple yet insightful question about a specific accomplishment or project you've worked on in your previous roles. This will help us understand how your background aligns with the requirements of the position. Keep it super simple."
+        else:
+            message = f"Ask a simple question. {prompt}"
+
         message = openai_client.beta.threads.messages.create(
             thread_id=thread.id,
             role="user",
@@ -57,7 +70,7 @@ def generate_interview_questions(prompt):
         run = openai_client.beta.threads.runs.create(
             thread_id=thread.id,
             assistant_id=assistant.id,
-            instructions="Please address the user as a candidate giving an interview"
+            instructions="This is a HR interview"
         )
         wait_for_run_completion(openai_client, thread.id, run.id)
         messages = openai_client.beta.threads.messages.list(
@@ -81,6 +94,7 @@ def generate_interview_questions(prompt):
             speech_file_path = Path(__file__).parent / f"static/question_{i}.mp3"
             response_audio.stream_to_file(speech_file_path)
             audio_paths.append(str(speech_file_path))
+
 
 @app.route("/")
 def interview_form():
@@ -106,7 +120,7 @@ def submit_form():
     assistant = openai_client.beta.assistants.create(
         name="HR Interviewer",
         instructions=f"You are an experienced HR interviewer conducting a job interview for a technical position. Begin the interview with casual and friendly conversation to make the candidate comfortable. Ask about their day, interests, or any recent achievements. Then, transition into more specific technical questions. Dive into the candidate's past projects, problem-solving abilities, and teamwork skills. Inquire about specific examples and seek details on how they handled challenges. Assess their communication and interpersonal skills. Provide a friendly and professional environment, allowing the candidate to showcase their strengths. Tailor your questions based on the candidate's responses to gather a comprehensive understanding. Keep the conversation engaging, and feel free to adapt your approach based on the candidate's background and responses.{prompt}",
-        model="gpt-4",
+        model="gpt-3.5-turbo",
     )
 
     # Redirect to the index page
@@ -162,6 +176,7 @@ def get_assessment():
         "You are an HR interviewer. Please analyze the candidate's interview performance. "
         "Provide an interview score out of 10 and a verdict on whether the candidate should be selected for further rounds. "
         "Additionally, add a one sentence super short comment on the interview performance. The assessment must be strict."
+        "Keep it super simple."
     )
 
     # Combine the prompt and user input
