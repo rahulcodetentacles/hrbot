@@ -64,90 +64,125 @@
         </div>
     </div>
 
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
     <script>
         $(document).ready(function () {
-    let mediaRecorder;
-    let audioChunks = [];
-    let currentAudio;
+            const socket = io.connect('http://' + document.domain + ':' + location.port);
 
-    function getQuestion() {
-        $.get("/get_question", function (data) {
-            if (data.question) {
-                $("#question").text("Question: " + data.question);
-                if (currentAudio) {
-                    currentAudio.pause();
-                    currentAudio.currentTime = 0;
-                }
-                const audioSrc = `/static/question_${data.questionIndex}.mp3`;
-                loadAndPlayAudio(audioSrc);
-                audioChunks = [];
-                startRecording();
-            } else {
-                $("#question-container").hide();
-                getAssessment();
+            let mediaRecorder;
+            let audioChunks = [];
+            let currentAudio;
+
+            function getQuestion() {
+                $.get("/get_question", function (data) {
+                    if (data.question) {
+                        $("#question").text("Question: " + data.question);
+                        if (currentAudio) {
+                            currentAudio.pause();
+                            currentAudio.currentTime = 0;
+                        }
+                        const audioSrc = `/static/question_${data.questionIndex}.mp3`;
+                        loadAndPlayAudio(audioSrc);
+                        audioChunks = [];
+                        startRecording();
+                    } else {
+                        $("#question-container").hide();
+                        getAssessment();
+                    }
+                });
             }
-        });
-    }
 
-    function startRecording() {
-        navigator.mediaDevices.getUserMedia({ audio: true })
-            .then(function (stream) {
-                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-                mediaRecorder.ondataavailable = function (event) {
-                    if (event.data.size > 0) {
-                        audioChunks.push(event.data);
+            function startRecording() {
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(function (stream) {
+                        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                        mediaRecorder.ondataavailable = function (event) {
+                            if (event.data.size > 0) {
+                                audioChunks.push(event.data);
+                            }
+                        };
+                        mediaRecorder.onstop = function () {
+                            let audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                            handleAudioData(audioBlob);
+                        };
+                        mediaRecorder.start();
+                    })
+                    .catch(function (error) {
+                        console.error("Error accessing microphone:", error);
+                    });
+            }
+
+            function handleAudioData(blob) {
+                const reader = new FileReader();
+                reader.onloadend = function () {
+                    const audioData = reader.result.split(',')[1];
+        
+                    // Use Web Speech API for speech recognition if supported
+                    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+                        recognizeSpeech(audioData);
+                    } else {
+                        console.error('SpeechRecognition API not supported in this browser.');
                     }
                 };
-                mediaRecorder.onstop = function () {
-                    let audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    convertToMp3(audioBlob);
-                };
-                mediaRecorder.start();
-            })
-            .catch(function (error) {
-                console.error("Error accessing microphone:", error);
+                reader.readAsDataURL(blob);
+            }
+        
+            function recognizeSpeech(audioData) {
+                const audioBuffer = new Uint8Array(atob(audioData).split('').map(char => char.charCodeAt(0)));
+        
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                audioContext.decodeAudioData(audioBuffer.buffer, function (buffer) {
+                    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                    recognition.onresult = function (event) {
+                        const transcript = event.results[0][0].transcript;
+                        console.log("Transcript:", transcript);
+        
+                        // Emit the plain text to the server
+                        socket.emit('audio_data', { audio_data: transcript });
+                    };
+                    recognition.onerror = function (event) {
+                        console.error("Speech recognition error:", event.error);
+                    };
+                    recognition.onend = function () {
+                        console.log("Speech recognition ended.");
+                    };
+        
+                    const source = audioContext.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(audioContext.destination);
+                    recognition.start();
+                    source.start();
+                }, function (error) {
+                    console.error("Audio decoding error:", error);
+                });
+            }
+
+            function loadAndPlayAudio(audioSrc) {
+                currentAudio = new Audio(audioSrc);
+                currentAudio.play();
+            }
+
+            function getAssessment() {
+                $.get("/get_assessment", function (data) {
+                    $("#assessment").text(data.assessment);
+                    $("#assessment-container").show();
+                });
+            }
+
+            socket.on('question_request', function (data) {
+                current_question_index = data.index;
+                getQuestion();
             });
-    }
 
-    function convertToMp3(blob) {
-        const reader = new FileReader();
-        reader.onloadend = function () {
-            const audioData = reader.result.split(',')[1];
-            $.ajax({
-                type: "POST",
-                url: "/submit_answer",
-                data: { answer: audioData },
-                success: function (data) {
-                    if (data.status === "success") {
-                        getQuestion();
-                    }
-                },
+            getQuestion();
+
+            $("#submit-answer").click(function () {
+                if (mediaRecorder && mediaRecorder.state === "recording") {
+                    mediaRecorder.stop();
+                }
             });
-        };
-        reader.readAsDataURL(blob);
-    }
-
-    function loadAndPlayAudio(audioSrc) {
-        currentAudio = new Audio(audioSrc);
-        currentAudio.play();
-    }
-
-    function getAssessment() {
-        $.get("/get_assessment", function (data) {
-            $("#assessment").text(data.assessment);
-            $("#assessment-container").show();
         });
-    }
-
-    getQuestion();
-
-    $("#submit-answer").click(function () {
-        if (mediaRecorder && mediaRecorder.state === "recording") {
-            mediaRecorder.stop();
-        }
-    });
-});
-
     </script>
 </body>
 
